@@ -1,0 +1,10 @@
+#!/bin/bash
+
+mysqldump -h snipe.middlebury.edu -u miiswp -p'xxxxxx' --lock-tables=false --set-gtid-purged=OFF --skip-extended-insert miiswp > ~/private_html/wordpress/wordpress-miis.sql
+
+perl -p -i -e 's#https?://blogs.miis.edu#http://anvil.middlebury.edu/~afranco/wordpress#gi' ~/private_html/wordpress/wordpress-miis.sql
+perl -p -i -e 's#blogs.miis.edu#anvil.middlebury.edu#gi' ~/private_html/wordpress/wordpress-miis.sql
+perl -p -i -e "s#anvil\.middlebury\.edu','/#anvil.middlebury.edu','/~afranco/wordpress/#gi" ~/private_html/wordpress/wordpress-miis.sql
+perl -p -i -e 's#/~afranco/wordpress/~afranco/wordpress/~afranco/wordpress/#/~afranco/wordpress/#gi' ~/private_html/wordpress/wordpress-miis.sql
+
+mysql -h 127.0.0.1 -u testuser -ptestpassword -D afranco_wordpress_miis < ~/private_html/wordpress/wordpress-miis.sql

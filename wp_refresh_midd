@@ -1,0 +1,89 @@
+#!/bin/bash
+
+DATABASE="afranco_wordpress_midd"
+URI="/~afranco/wordpress"
+DEST_FILE_PATH="/home/afranco/private_html/wordpress/blogs.dir/"
+
+SITES=()
+
+SITES+=("1") # /middblogs THIS IS REQUIRED
+SITES+=("51") # www.nereviewcom
+SITES+=("92") # /lis
+SITES+=("1433") # /middlab
+SITES+=("1505") # /middstart
+SITES+=("1585") # /announcements
+SITES+=("3243") # /dla
+SITES+=("1614") # www.middmag.com
+SITES+=("1701") # /changeblog
+SITES+=("1950") # /middhistory
+SITES+=("1969") # /mcse
+SITES+=("1993") # /middgoal
+SITES+=("2117") # /wrmc
+SITES+=("2453") # /middcore
+SITES+=("2465") # /flanders
+SITES+=("2639") # www.middleburysnowbowl.com
+
+# Sync files
+RSYNC_CMD="rsync -av ";
+for SITE in "${SITES[@]}"
+do
+	RSYNC_CMD+="--include=\"${SITE}/***\" "
+done
+RSYNC_CMD+=" --exclude=\"*\" root@orator:/var/www/wordpress-mu/wp-content/blogs.dir/ $DEST_FILE_PATH"
+
+echo "Syncing files"
+echo $RSYNC_CMD
+eval $RSYNC_CMD
+
+
+TABLES=()
+PREFIXES=()
+for SITE in "${SITES[@]}"
+do
+	PREFIXES+=("wp_${SITE}_")
+done
+
+TABLELIST=$(mysql -h snipe -u wpmidd -p"xxxxx" wordpress -e "show tables;" | awk '{ print $1}' | grep -v '^Tables')
+for i in $TABLELIST
+do
+	# Add non-individual-blog tables
+	if [[ $i =~ ^wp_[a-z] ]]
+	then
+		TABLES+=($i)
+	fi
+
+	# Add tables of our chosen blogs
+	for PREFIX in "${PREFIXES[@]}"
+	do
+		if [[ $i == $PREFIX* ]]
+		then
+			TABLES+=($i)
+		fi
+	done
+done
+
+echo "Tables being dumped:"
+echo ${TABLES[@]}
+mysqldump -h snipe -u wpmidd -p"xxxxxxx" wordpress --set-gtid-purged=OFF --lock-tables=false --skip-extended-insert ${TABLES[@]} > $DATABASE.sql
+
+echo "Swapping paths"
+perl -p -i -e "s#http://sites.middlebury.edu#http://anvil.middlebury.edu$URI#gi" $DATABASE.sql
+perl -p -i -e 's#sites.middlebury.edu#anvil.middlebury.edu#gi' $DATABASE.sql
+perl -p -i -e "s#anvil\.middlebury\.edu','/#anvil.middlebury.edu','$URI/#gi" $DATABASE.sql
+
+echo "Importing data from for $DATABASE into local database"
+mysql -u testuser -ptestpassword -h localhost $DATABASE < $DATABASE.sql
+
+rm -f $DATABASE.sql
+
+# Add tables of our chosen blogs
+for PREFIX in "${PREFIXES[@]}"
+do
+	if [[ $i == $PREFIX* ]]
+	then
+		wp_update_settings_midd "${PREFIX}options"
+	fi
+done
+
+
+

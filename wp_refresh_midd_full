@@ -1,0 +1,12 @@
+#!/bin/bash
+
+mysqldump -h snipe.middlebury.edu -u wpmidd -pxxxxxxx --lock-tables=false --set-gtid-purged=OFF --skip-extended-insert wordpress > ~/private_html/wordpress/wordpress.sql
+
+perl -p -i -e 's#http://sites.middlebury.edu#http://anvil.middlebury.edu/~afranco/wordpress#gi' ~/private_html/wordpress/wordpress.sql
+perl -p -i -e 's#sites.middlebury.edu#anvil.middlebury.edu#gi' ~/private_html/wordpress/wordpress.sql
+perl -p -i -e "s#anvil\.middlebury\.edu','/#anvil.middlebury.edu','/~afranco/wordpress/#gi" ~/private_html/wordpress/wordpress.sql
+perl -p -i -e 's#/~afranco/wordpress/~afranco/wordpress/~afranco/wordpress/#/~afranco/wordpress/#gi' ~/private_html/wordpress/wordpress.sql
+
+mysql -h localhost -u testuser -ptestpassword -D afranco_wordpress_midd < ~/private_html/wordpress/wordpress.sql
+
+wp_update_settings_midd

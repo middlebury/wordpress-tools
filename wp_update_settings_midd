@@ -1,0 +1,148 @@
+#!/usr/bin/env php
+<?php
+
+//Note: Visiting sites imported into DEV before running this script can result in lost settings. Run this script immediately after importing tables to avoid losing settings.
+
+//DB connection Constants
+define('USER','testuser');
+define('PASSWORD','testpassword');
+define('HOST','localhost');
+define('DB','afranco_wordpress_midd');
+define('DEV','anvil.middlebury.edu/~afranco/wordpress');
+define('LIVE','sites.middlebury.edu');
+  
+//Connect
+$connection = db_connect(USER, PASSWORD, HOST, DB);
+  
+//Use argument for single table
+if (isset($argv[1])) {
+  	
+  //get argument as array with single value
+  $table = array_slice($argv, 1);
+  	
+  //check for properly formed argument
+ 	if (preg_match('/^wp_[0-9]*_options$/',$table[0])) {
+		$options_tables = $table;
+		//$refresh = false;
+	} else {
+		print "Bad argument format. Use: wp_000_options\n";
+		db_disconnect();
+		die();
+	}
+		
+	//else apply to all options tables
+} else {
+  
+	//Get list of wp_XX_options tables
+	$options_tables = get_tables($connection, DB);
+  //$refresh = true;*/
+}
+	
+//Loop through options tables and select widget/theme settings
+foreach($options_tables as $options_table) {
+
+	$sql = 'SELECT
+						*
+					FROM
+						'.$options_table.'
+					WHERE
+						(option_name LIKE "%widget%"
+					AND
+						option_value LIKE "%anvil.middlebury.edu%")	
+					OR
+						(option_name LIKE "%theme%"
+					AND
+						option_value LIKE "%anvil.middlebury.edu%");';
+		
+	//Swap back in the live URLs					
+	foreach ($connection->query($sql) as $row) {
+   	$results[$options_table][$row['option_name']] = str_replace(DEV,LIVE,$row['option_value']);
+  }
+}
+	
+//var_dump($results['wp_813_options']);
+
+if (!isset($results)) {
+	print "No options to update.\n";
+	db_disconnect();
+	die();
+} 
+
+//Unserialise the data
+foreach ($results as &$result) {
+	foreach ($result as &$serialized_string){
+		if (is_string($serialized_string)) {
+			$serialized_string = unserialize($serialized_string);
+		}
+	}
+}
+	
+//Swap the DEV URLs back in
+array_walk_recursive($results, 'url_swap');
+	
+//Re-serialise the data
+foreach ($results as &$result) {
+	foreach ($result as &$unserialized_array){
+		$unserialized_array = serialize($unserialized_array);
+	}
+}
+	
+//insert the updated strings
+foreach ($results as $table => $options) {
+
+	foreach ($options as $name => $value){
+
+		$sql = $connection->prepare("UPDATE ".$table." SET option_value = ? WHERE option_name = ?");
+
+		if ($sql->execute(array($value, $name))) {
+			print "Updated ". $table . " " .$name. ".\n";
+		} else {
+			print "Error updating ". $table . " " .$name. ".\n";
+		}
+	}
+}
+	
+//Disconnect
+db_disconnect();
+
+//Helper functions
+
+//Swap out the LIVE URLs for the DEV ones
+function url_swap(&$value, $key) {
+	if (is_string($value)) {
+		$value = str_ireplace(LIVE,DEV,$value);
+	}
+}
+
+//Connect to the DB (encorce UTF8)
+function db_connect($user, $pass, $host, $db) {
+  try {
+    $dbh = new PDO('mysql:host='.$host.';dbname='.$db, $user, $pass, array(PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES \'UTF8\''));
+    print "connected\n";
+    return $dbh;
+  } catch (PDOException $e) {
+    print "Error!: " . $e->getMessage() . "<br/>";
+    die();
+  }
+}
+
+//Disconnect from the DB
+function db_disconnect() {
+  $dbh = null;
+  print "disconnected\n";
+}
+
+//Get all WP options tables
+function get_tables($dbh, $db) {
+  $sql = 'SHOW TABLES FROM '.$db.' LIKE "%_options"';
+  $options_tables = array();
+  foreach ($dbh->query($sql) as $row) {
+    $options_tables[] = $row[0];
+  }
+  if (!empty($options_tables)) {
+    return $options_tables;
+  } else {
+    print "No tables";
+    die();
+  }
+}

@@ -1,0 +1,50 @@
+#!/usr/bin/env php
+<?php
+
+if (!isset($argv[1]) || !strlen(trim($argv[1])) || $argv[1] == '-h' || $argv[1] == '--help') {
+	print <<< END
+Usage:
+	$argv[0] <plugin_name>
+
+Example:
+	$argv[0] cforms
+
+END;
+exit(1);
+}
+
+$plugin = $argv[1];
+print "Blogs using $plugin:\n";
+// require('/home/wordpress/websites/blogs/wp-config.php');
+
+define('DB_NAME', 'wordpress');    // The name of the database
+define('DB_USER', 'wordpress');     // Your MySQL username
+define('DB_PASSWORD', 'xxxx'); // ...and password
+define('DB_HOST', 'snipe.middlebury.edu');    // 99% chance you won't need to change this value
+
+$db = new mysqli(DB_HOST, DB_USER, DB_PASSWORD, DB_NAME);
+
+$tableRes = $db->query('SHOW TABLES;');
+while($row = $tableRes->fetch_row()) {
+	$table = $row[0];
+	if (preg_match('/^wp[_0-9]*_options$/', $table)) {
+		$usingRes = $db->query("select option_name, option_value from ".$table." where option_name='active_plugins' AND option_value LIKE '%".$db->escape_string($plugin)."%';");
+		if ($usingRes->num_rows) {
+			$nameRes = $db->query("select option_value from ".$table." where option_name = 'home';");
+			$nameRow = $nameRes->fetch_row();
+			$url = $nameRow[0];
+			$nameRes->free();
+			
+			$nameRes = $db->query("select option_value from ".$table." where option_name = 'admin_email';");
+			$nameRow = $nameRes->fetch_row();
+			$email = $nameRow[0];
+			$nameRes->free();
+			
+			print $table."\t".$url."\t".$email."\n";
+		}
+		$usingRes->free();
+	}
+}
+$tableRes->free();
+
+$db->close(); 

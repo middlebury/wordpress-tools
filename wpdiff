@@ -1,0 +1,29 @@
+#!/bin/bash
+
+if [ $# != 0 ]
+then
+	echo -e "usage:"
+	echo -e "	$0 "
+	echo ""
+	exit 1
+fi
+
+branch_name="$(git symbolic-ref HEAD 2>/dev/null)" ||
+branch_name="$(git-rev-parse HEAD)"     # detached HEAD
+branch_name=${branch_name##refs/heads/}
+
+
+git-checkout custom
+if [ $? ]
+then
+	exit $?
+fi
+
+diff -qr ~/private_html/wordpress/wordpress-mu ~/private_html/wordpress/wordpress-mu-prod/
+if [ $? ]
+then
+	exit $?
+fi
+
+git-checkout $branch_name
+

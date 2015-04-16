@@ -1,0 +1,59 @@
+#!/bin/sh
+
+##############################################################################
+# List the latest update date of all plugins in a wordpress as reported by the
+# git plugins branch logs.
+#
+# Example usage:
+#	wp_list_plugin_update_dates /path/to/wordpress/root/
+#
+# Author: Adam Franco
+# Date: 2015-02-06
+# License: http://www.gnu.org/copyleft/gpl.html GNU General Public License (GPL)
+##############################################################################
+
+usage="Usage: `basename $0` -p </path/to/wordpress/root/>"
+
+# Set up options
+while getopts ":p:" options; do
+	case $options in
+	p ) basepath=$OPTARG;;
+	\? ) echo -e $usage
+		exit 1;;
+	* ) echo -e $usage
+		exit 1;;
+
+	esac
+done
+
+currentDirectory=pwd
+
+# Test for basepath
+if [  ! -n "$basepath" ]
+then
+	echo -e "Base path doesn't exist: $basepath"
+	echo -e $usage
+	exit 1
+fi
+
+pluginpath="${basepath}/wp-content/plugins/"
+
+# Test for basepath
+if [  ! -n "$pluginpath" ]
+then
+	echo -e "Plugin path doesn't exist: $pluginpath"
+	echo -e $usage
+	exit 1
+fi
+
+cd $pluginpath
+
+for subpath in $pluginpath/*; do
+	subdir=`basename $subpath`;
+
+	if [  ! -h "$subpath" -a $subdir != "index.php" ]
+	then
+		moddate=`git log -1 --pretty=format:"%ci" plugins -- $subdir`
+		echo "$subdir	$moddate"
+	fi
+done

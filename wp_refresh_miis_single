@@ -1,0 +1,29 @@
+#!/bin/bash
+
+if [ ! $# == 1 ]; then
+  echo usage: $0 siteid
+  exit
+fi
+
+DEST_FILE_PATH="/home/afranco/private_html/wordpress/blogs.dir/"
+
+SITE=$1
+PREFIX="wp_${SITE}"
+
+echo "Dumping the remote database to $PREFIX.sql"
+mysqldump -h snipe -u wpmiis -pxxxxxx miiswp --set-gtid-purged=OFF --lock-tables=false --skip-extended-insert $(mysql -h snipe -u wpmiis -pxxxxxx -D miiswp -Bse "show tables like '$PREFIX%'") > $PREFIX.sql
+
+echo "Swapping paths"
+perl -p -i -e "s#http://sites.miis.edu#http://anvil.middlebury.edu/~afranco/wordpress#gi" $PREFIX.sql
+perl -p -i -e 's#sites.miis.edu#anvil.middlebury.edu#gi' $PREFIX.sql
+perl -p -i -e "s#anvil\.middlebury\.edu','/#anvil.middlebury.edu','/~afranco/wordpress/#gi" $PREFIX.sql
+
+echo "Importing data from for $PREFIX into local database"
+mysql -h localhost -u testuser -ptestpassword afranco_wordpress_miis < $PREFIX.sql
+
+rm -f $PREFIX.sql
+
+wp_update_settings_miis "${PREFIX}_options"
+
+echo "Syncing files"
+rsync -av --include="${SITE}/***" --exclude="*" bigsur:/var/www/wordpress-mu/wp-content/blogs.dir/ "$DEST_FILE_PATH"
