@@ -1,0 +1,99 @@
+#!/bin/bash
+######################################
+# Set up our environment and variables
+######################################
+usage="usage: $0 <config-section>"
+# Define our directory path
+pushd `dirname $0` > /dev/null
+script_path=`pwd -P`
+popd > /dev/null
+wp_tools_path=$(dirname $script_path)
+# Include the setup script to define our common variables
+source $wp_tools_path/lib/setup.sh
+
+
+SITES=()
+
+SITES+=("1") # /middblogs THIS IS REQUIRED
+SITES+=("51") # www.nereviewcom
+SITES+=("92") # /lis
+SITES+=("1433") # /middlab
+SITES+=("1505") # /middstart
+SITES+=("1585") # /announcements
+SITES+=("3243") # /dla
+SITES+=("1614") # www.middmag.com
+SITES+=("1701") # /changeblog
+SITES+=("1950") # /middhistory
+SITES+=("1969") # /mcse
+SITES+=("1993") # /middgoal
+SITES+=("2117") # /wrmc
+SITES+=("2453") # /middcore
+SITES+=("2465") # /flanders
+SITES+=("2639") # www.middleburysnowbowl.com
+
+# Sync files
+RSYNC_CMD="rsync -av ";
+for SITE in "${SITES[@]}"
+do
+	RSYNC_CMD+="--include=\"${SITE}/***\" "
+done
+RSYNC_CMD+=" --exclude=\"*\" ${prod_fs_user_prefix}${prod_fs_host}:${prod_fs_path}/wp-content/blogs.dir/ ${dev_fs_path}/wp-content/blogs.dir/"
+
+echo "Syncing files"
+echo $RSYNC_CMD
+eval $RSYNC_CMD
+
+TABLES=()
+PREFIXES=()
+for SITE in "${SITES[@]}"
+do
+	PREFIXES+=("wp_${SITE}_")
+done
+
+TABLELIST=$(mysql -h ${prod_db_host} -u ${prod_db_user} -p"${prod_db_password}" -D ${prod_db_database} -e "show tables;" | awk '{ print $1}' | grep -v '^Tables')
+for i in $TABLELIST
+do
+	# Add non-individual-blog tables
+	if [[ $i =~ ^wp_[a-z] ]]
+	then
+		TABLES+=($i)
+	fi
+
+	# Add tables of our chosen blogs
+	for PREFIX in "${PREFIXES[@]}"
+	do
+		if [[ $i == $PREFIX* ]]
+		then
+			TABLES+=($i)
+		fi
+	done
+done
+
+echo "Tables being dumped:"
+echo ${TABLES[@]}
+mysqldump -h ${prod_db_host} -u ${prod_db_user} -p"${prod_db_password}" ${prod_db_database} --set-gtid-purged=OFF --lock-tables=false --skip-extended-insert ${TABLES[@]} > "${prod_db_database}.sql"
+
+
+echo "Swapping paths"
+prod_http_host_escaped=${prod_http_host//./\\.}
+dev_http_host_escaped=${dev_http_host//./\\.}
+echo "Replacing:  s#https?://${prod_http_host_escaped}${prod_http_path}#http://${dev_http_host}${dev_http_path}#gi"
+perl -p -i -e "s#https?://${prod_http_host_escaped}${prod_http_path}#http://${dev_http_host}${dev_http_path}#gi" "${prod_db_database}.sql"
+echo "Replacing:  s#${prod_http_host_escaped}#${dev_http_host}#gi"
+perl -p -i -e "s#${prod_http_host_escaped}#${dev_http_host}#gi" "${prod_db_database}.sql"
+echo "Replacing:  s#${dev_http_host_escaped}','${prod_http_path}/#${dev_http_host}','${dev_http_path}/#gi"
+perl -p -i -e "s#${dev_http_host_escaped}','${prod_http_path}/#${dev_http_host}','${dev_http_path}/#gi" "${prod_db_database}.sql"
+
+echo "Importing data from for $DATABASE into local database"
+mysql -h ${dev_db_host} -u ${dev_db_user} -p"${dev_db_password}" ${dev_db_database} < "${prod_db_database}.sql"
+
+rm -f "${prod_db_database}.sql"
+
+# Update blog options
+for SITE in "${SITES[@]}"
+do
+	$script_path/wp_update_settings $config_section "${SITE}"
+done
+
+
+

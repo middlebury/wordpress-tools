@@ -1,0 +1,16 @@
+#!/bin/env php
+<?php
+
+$usage = <<<END
+Usage: $argv[0] <file.ini>
+
+END;
+
+if (empty($argv[1]) || count($argv) > 2) {
+	fwrite(STDERR, $usage);
+	exit(1);
+}
+
+$ini = parse_ini_file($argv[1], true);
+echo implode("\n", array_keys($ini));
+echo "\n";

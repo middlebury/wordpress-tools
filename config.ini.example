@@ -1,0 +1,40 @@
+[midd]
+; Destination to import data into.
+dev_http_host     = anvil.middlebury.edu
+dev_http_path     = "/~afranco/wordpress/"
+dev_fs_path       = /home/afranco/private_html/wordpress/wordpress/
+dev_db_host       = localhost
+dev_db_database   = afranco_wordpress_midd
+dev_db_user       = testuser
+dev_db_password   = testpassword
+
+; Location to source data from.
+prod_http_host    = sites.middlebury.edu
+prod_http_path    = /
+prod_fs_host      = orator.middlebury.edu
+prod_fs_path      = /var/www/wordpress-mu/
+prod_fs_user      =                           ; Might be 'root' or some other account, defaults to the current user account
+prod_db_host      = snipe.middlebury.edu
+prod_db_database  = wordpress
+prod_db_user      = wad_export_ro
+prod_db_password  = password
+
+[miis]
+; Destination to import data into.
+dev_http_host     = anvil.middlebury.edu
+dev_http_path     = "/~afranco/wordpress/"
+dev_fs_path       = /home/afranco/private_html/wordpress/wordpress/
+dev_db_host       = localhost
+dev_db_database   = afranco_wordpress_miis
+dev_db_user       = testuser
+dev_db_password   = testpassword
+
+; Location to source data from.
+prod_http_host    = sites.miis.edu
+prod_http_path    = /
+prod_fs_host      = bigsur.middlebury.edu
+prod_fs_path      = /var/www/wordpress-mu/
+prod_db_host      = snipe.middlebury.edu
+prod_db_database  = miiswp
+prod_db_user      = wad_export_ro
+prod_db_password  = password

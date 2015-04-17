@@ -3,34 +3,71 @@
 
 //Note: Visiting sites imported into DEV before running this script can result in lost settings. Run this script immediately after importing tables to avoid losing settings.
 
-//DB connection Constants
-define('USER','testuser');
-define('PASSWORD','testpassword');
-define('HOST','localhost');
-define('DB','afranco_wordpress_midd');
-define('DEV','anvil.middlebury.edu/~afranco/wordpress');
-define('LIVE','sites.middlebury.edu');
+$usage = <<<END
+Usage: $argv[0] <config-section> [site-id]
+
+END;
+
+$config_section = $argv[1];
+if (empty($config_section) || $argc > 3) {
+	fwrite(STDERR, $usage);
+	exit(1);
+}
+
+$ini = parse_ini_file(dirname(dirname(__FILE__)).'/config.ini', true);
+global $dev_uri, $prod_uri;
+if (empty($ini[$config_section])) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "Config section, [$config_section], was not found in the ini file.");
+	exit(1);
+}
+
+$dev_http_host = $ini[$config_section]['dev_http_host'];
+if (empty($dev_http_host)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have dev_http_host defined.");
+	exit(2);
+}
+$dev_http_path = $ini[$config_section]['dev_http_path'];
+if (empty($dev_http_path)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have dev_http_path defined.");
+	exit(2);
+}
+$dev_uri = $dev_http_host.rtrim($dev_http_path, '/');
+
+$prod_http_host = $ini[$config_section]['prod_http_host'];
+if (empty($prod_http_host)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have prod_http_host defined.");
+	exit(2);
+}
+$prod_http_path = $ini[$config_section]['prod_http_path'];
+if (empty($prod_http_path)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have prod_http_path defined.");
+	exit(2);
+}
+$prod_uri = $prod_http_host.rtrim($prod_http_path, '/');
   
 //Connect
-$connection = db_connect(USER, PASSWORD, HOST, DB);
+$connection = db_connect($ini[$config_section]['dev_db_user'], $ini[$config_section]['dev_db_password'], $ini[$config_section]['dev_db_host'], $ini[$config_section]['dev_db_database']);
   
 //Use argument for single table
-if (isset($argv[1])) {
+if (isset($argv[2])) {
+  $site_id = $argv[2];
+  // Verify that this is an int.
+  if (!preg_match('/^[0-9]+$/', $site_id)) {
+  	fwrite(STDERR, $usage);
+	fwrite(STDERR, "Site-id, $site_id, must be an integer.");
+	db_disconnect();
+	exit(1);
+  }
   	
   //get argument as array with single value
-  $table = array_slice($argv, 1);
+  $options_tables = array('wp_'.$site_id.'_options');
   	
-  //check for properly formed argument
- 	if (preg_match('/^wp_[0-9]*_options$/',$table[0])) {
-		$options_tables = $table;
-		//$refresh = false;
-	} else {
-		print "Bad argument format. Use: wp_000_options\n";
-		db_disconnect();
-		die();
-	}
-		
-	//else apply to all options tables
+  //else apply to all options tables
 } else {
   
 	//Get list of wp_XX_options tables
@@ -48,15 +85,15 @@ foreach($options_tables as $options_table) {
 					WHERE
 						(option_name LIKE "%widget%"
 					AND
-						option_value LIKE "%anvil.middlebury.edu%")	
+						option_value LIKE "%'.$dev_http_host.'%")	
 					OR
 						(option_name LIKE "%theme%"
 					AND
-						option_value LIKE "%anvil.middlebury.edu%");';
+						option_value LIKE "%'.$dev_http_host.'%");';
 		
 	//Swap back in the live URLs					
 	foreach ($connection->query($sql) as $row) {
-   	$results[$options_table][$row['option_name']] = str_replace(DEV,LIVE,$row['option_value']);
+   	$results[$options_table][$row['option_name']] = str_replace($dev_uri, $prod_uri,$row['option_value']);
   }
 }
 	
@@ -109,8 +146,11 @@ db_disconnect();
 
 //Swap out the LIVE URLs for the DEV ones
 function url_swap(&$value, $key) {
+	global $dev_uri, $prod_uri;
 	if (is_string($value)) {
-		$value = str_ireplace(LIVE,DEV,$value);
+// 		echo "$key\n\tOld:\t$value";
+		$value = str_ireplace($prod_uri,$dev_uri,$value);
+// 		echo "\n\tnew:\t$value\n";
 	}
 }
 
