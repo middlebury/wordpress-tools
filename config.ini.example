@@ -19,6 +19,23 @@ prod_db_database  = wordpress
 prod_db_user      = wad_export_ro
 prod_db_password  = password
 
+; Default sites to refresh. Note that site '1' is always included.
+default_sites[]   = 51		; www.nereviewcom
+default_sites[]   = 92		; /lis
+default_sites[]   = 1433	; /middlab
+default_sites[]   = 1505	; /middstart
+default_sites[]   = 1585	; /announcements
+default_sites[]   = 3243	; /dla
+default_sites[]   = 1614	; www.middmag.com
+default_sites[]   = 1701	; /changeblog
+default_sites[]   = 1950	; /middhistory
+default_sites[]   = 1969	; /mcse
+default_sites[]   = 1993	; /middgoal
+default_sites[]   = 2117	; /wrmc
+default_sites[]   = 2453	; /middcore
+default_sites[]   = 2465	; /flanders
+default_sites[]   = 2639	; www.middleburysnowbowl.com
+
 [miis]
 ; Destination to import data into.
 dev_http_host     = anvil.middlebury.edu
@@ -38,3 +55,6 @@ prod_db_host      = snipe.middlebury.edu
 prod_db_database  = miiswp
 prod_db_user      = wad_export_ro
 prod_db_password  = password
+
+; Default sites to refresh. Note that site '1' is always included.
+default_sites[]   = 813		; /wip

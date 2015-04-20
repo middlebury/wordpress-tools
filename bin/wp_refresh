@@ -13,23 +13,17 @@ source $wp_tools_path/lib/setup.sh
 
 
 SITES=()
-
 SITES+=("1") # /middblogs THIS IS REQUIRED
-SITES+=("51") # www.nereviewcom
-SITES+=("92") # /lis
-SITES+=("1433") # /middlab
-SITES+=("1505") # /middstart
-SITES+=("1585") # /announcements
-SITES+=("3243") # /dla
-SITES+=("1614") # www.middmag.com
-SITES+=("1701") # /changeblog
-SITES+=("1950") # /middhistory
-SITES+=("1969") # /mcse
-SITES+=("1993") # /middgoal
-SITES+=("2117") # /wrmc
-SITES+=("2453") # /middcore
-SITES+=("2465") # /flanders
-SITES+=("2639") # www.middleburysnowbowl.com
+
+default_sites=($($wp_tools_path/lib/ini_get_var $config_file $config_section 'default_sites'))
+if [ -z "$default_sites" ]; then
+  echo $usage
+  echo "    default_sites was not defined in section [$config_section] of $config_file"
+  exit 13
+fi
+# Concatenate our specified sites with site 1
+SITES=("${SITES[@]}" "${default_sites[@]}")
+
 
 # Sync files
 RSYNC_CMD="rsync -av ";

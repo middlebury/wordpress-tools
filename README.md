@@ -29,6 +29,11 @@ its own section and you can define as many "production" sources and "dev" destin
     prod_db_database  = wordpress
     prod_db_user      = wad_export_ro
     prod_db_password  = password
+    
+    ; Default sites to refresh. Note that site '1' is always included.
+    default_sites[]   = 51		; www.nereviewcom
+    default_sites[]   = 92		; /lis
+    default_sites[]   = 1433	; /middlab
 
 ## Setup
 

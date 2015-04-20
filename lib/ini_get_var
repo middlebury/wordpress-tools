@@ -22,4 +22,9 @@ if (!isset($ini[$argv[2]][$argv[3]])) {
 	fwrite(STDERR, "variable, ".$argv[3].", was not found in the [".$argv[2]."] section of the ini file.\n");
 	exit(3);
 }
-print $ini[$argv[2]][$argv[3]]."\n";
+
+if (is_array($ini[$argv[2]][$argv[3]])) {
+	print implode(" ", $ini[$argv[2]][$argv[3]])."\n";
+} else {
+	print $ini[$argv[2]][$argv[3]]."\n";
+}
