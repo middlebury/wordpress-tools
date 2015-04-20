@@ -36,7 +36,7 @@ then
 	exit 1
 fi
 
-pluginpath="${basepath}/wp-content/plugins/"
+pluginpath=$(readlink -e "${basepath}/wp-content/plugins/")
 
 # Test for basepath
 if [  ! -n "$pluginpath" ]
@@ -49,11 +49,10 @@ fi
 cd $pluginpath
 
 for subpath in $pluginpath/*; do
-	subdir=`basename $subpath`;
-
+	subdir=$(basename $subpath);
 	if [  ! -h "$subpath" -a $subdir != "index.php" ]
 	then
-		moddate=`git log -1 --pretty=format:"%ci" plugins -- $subdir`
+		moddate=$(git log -1 --pretty=format:"%ci" plugins -- $subdir)
 		echo "$subdir	$moddate"
 	fi
 done
