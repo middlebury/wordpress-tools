@@ -31,7 +31,6 @@ if (empty($ini[$config_section])) {
 
 
 $plugin = $argv[2];
-print "Blogs using $plugin:\n";
 // require('/home/wordpress/websites/blogs/wp-config.php');
 
 $prod_db_host = $ini[$config_section]['prod_db_host'];
@@ -65,7 +64,7 @@ $db = new mysqli($prod_db_host, $prod_db_user, $prod_db_password, $prod_db_datab
 $tableRes = $db->query('SHOW TABLES;');
 while($row = $tableRes->fetch_row()) {
 	$table = $row[0];
-	if (preg_match('/^wp[_0-9]*_options$/', $table)) {
+	if (preg_match('/^wp_?([0-9]*)_options$/', $table, $matches)) {
 		$usingRes = $db->query("select option_name, option_value from ".$table." where option_name='active_plugins' AND option_value LIKE '%".$db->escape_string($plugin)."%';");
 		if ($usingRes->num_rows) {
 			$nameRes = $db->query("select option_value from ".$table." where option_name = 'home';");
@@ -78,7 +77,7 @@ while($row = $tableRes->fetch_row()) {
 			$email = $nameRow[0];
 			$nameRes->free();
 			
-			print $table."\t".$url."\t".$email."\n";
+			print $matches[1]."\t".$url."\t".$email."\n";
 		}
 		$usingRes->free();
 	}
