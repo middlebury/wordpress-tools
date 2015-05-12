@@ -19,36 +19,6 @@ if [ -z "$site_id" ]; then
   exit 12
 fi
 
-# Sync files
-RSYNC_CMD="rsync -av ";
-RSYNC_CMD+="--include=\"${site_id}/***\" "
-RSYNC_CMD+=" --exclude=\"*\" ${prod_fs_user_prefix}${prod_fs_host}:${prod_fs_path}/wp-content/blogs.dir/ ${dev_fs_path}/wp-content/blogs.dir/"
-
-echo "Syncing files"
-echo $RSYNC_CMD
-eval $RSYNC_CMD
-
-
-PREFIX="wp_${site_id}_"
-
-echo "Dumping the remote database to $PREFIX.sql"
-mysqldump -h ${prod_db_host} -u ${prod_db_user} -p"${prod_db_password}" ${prod_db_database} --set-gtid-purged=OFF --lock-tables=false --skip-extended-insert $(mysql -h ${prod_db_host} -u ${prod_db_user} -p"${prod_db_password}" ${prod_db_database} -Bse "show tables like '$PREFIX%'") > $PREFIX.sql
-
-
-echo "Swapping paths"
-prod_http_host_escaped=${prod_http_host//./\\.}
-dev_http_host_escaped=${dev_http_host//./\\.}
-echo "Replacing:  s#https?://${prod_http_host_escaped}${prod_http_path}#http://${dev_http_host}${dev_http_path}#gi"
-perl -p -i -e "s#https?://${prod_http_host_escaped}${prod_http_path}#http://${dev_http_host}${dev_http_path}#gi" $PREFIX.sql
-echo "Replacing:  s#${prod_http_host_escaped}#${dev_http_host}#gi"
-perl -p -i -e "s#${prod_http_host_escaped}#${dev_http_host}#gi" $PREFIX.sql
-echo "Replacing:  s#${dev_http_host_escaped}','${prod_http_path}/#${dev_http_host}','${dev_http_path}/#gi"
-perl -p -i -e "s#${dev_http_host_escaped}','${prod_http_path}/#${dev_http_host}','${dev_http_path}/#gi" $PREFIX.sql
-
-echo "Importing data from for $PREFIX into local database"
-mysql -h ${dev_db_host} -u ${dev_db_user} -p"${dev_db_password}" ${dev_db_database} < $PREFIX.sql
-
-rm -f $PREFIX.sql
-
-$script_path/wp_update_settings $config_section "${site_id}"
+# Call our refresh script with the configured sites:
+$script_path/wp_refresh $config_section $site_id
 
