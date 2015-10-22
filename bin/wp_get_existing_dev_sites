@@ -1,0 +1,82 @@
+#!/usr/bin/env php
+<?php
+
+$usage = <<<END
+Usage:
+	$argv[0] <config-section>
+
+Returns a list of sites that have been synced to dev for the config-section provided.
+
+Example:
+	$argv[0] midd
+
+END;
+
+if (empty($argv[1]) || $argc > 2) {
+	fwrite(STDERR, $usage);
+	exit(1);
+}
+$config_section = $argv[1];
+
+$ini = parse_ini_file(dirname(dirname(__FILE__)).'/config.ini', true);
+global $dev_uri, $prod_uri;
+if (empty($ini[$config_section])) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "Config section, [$config_section], was not found in the ini file.");
+	exit(1);
+}
+
+$dev_db_host = $ini[$config_section]['dev_db_host'];
+if (empty($dev_db_host)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have dev_db_host defined.");
+	exit(2);
+}
+$dev_db_database = $ini[$config_section]['dev_db_database'];
+if (empty($dev_db_database)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have dev_db_database defined.");
+	exit(2);
+}
+$dev_db_user = $ini[$config_section]['dev_db_user'];
+if (empty($dev_db_user)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have dev_db_user defined.");
+	exit(2);
+}
+$dev_db_password = $ini[$config_section]['dev_db_password'];
+if (empty($dev_db_password)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have dev_db_password defined.");
+	exit(2);
+}
+
+$dev_db = new mysqli($dev_db_host, $dev_db_user, $dev_db_password, $dev_db_database);
+
+$dev_sites = array();
+$tableRes = $dev_db->query('SHOW TABLES;');
+while($row = $tableRes->fetch_row()) {
+	if (preg_match('/^wp_([0-9]+)_options$/', $row[0], $matches) && !in_array($matches[1], $dev_sites)) {
+		$dev_sites[] = $matches[1];
+	}
+}
+$tableRes->free();
+
+sort($dev_sites, SORT_NUMERIC);
+
+foreach ($dev_sites as $id) {
+	$options_table = 'wp_'.$id.'_options';
+	$nameRes = $dev_db->query("select option_value from ".$options_table." where option_name = 'home';");
+	$nameRow = $nameRes->fetch_row();
+	$url = $nameRow[0];
+	$nameRes->free();
+
+	$nameRes = $dev_db->query("select option_value from ".$options_table." where option_name = 'admin_email';");
+	$nameRow = $nameRes->fetch_row();
+	$email = $nameRow[0];
+	$nameRes->free();
+
+	print $id."\t".$url."\t".$email."\n";
+}
+
+$dev_db->close();
