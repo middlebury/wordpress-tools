@@ -49,10 +49,10 @@ if (empty($prod_http_path)) {
 	exit(2);
 }
 $prod_uri = $prod_http_host.rtrim($prod_http_path, '/');
-  
+
 //Connect
 $connection = db_connect($ini[$config_section]['dev_db_user'], $ini[$config_section]['dev_db_password'], $ini[$config_section]['dev_db_host'], $ini[$config_section]['dev_db_database']);
-  
+
 //Use argument for single table
 if (isset($argv[2])) {
   $site_id = $argv[2];
@@ -63,18 +63,18 @@ if (isset($argv[2])) {
 	db_disconnect();
 	exit(1);
   }
-  	
+
   //get argument as array with single value
   $options_tables = array('wp_'.$site_id.'_options');
-  	
+
   //else apply to all options tables
 } else {
-  
+
 	//Get list of wp_XX_options tables
 	$options_tables = get_tables($connection, DB);
   //$refresh = true;*/
 }
-	
+
 //Loop through options tables and select widget/theme settings
 foreach($options_tables as $options_table) {
 
@@ -85,25 +85,42 @@ foreach($options_tables as $options_table) {
 					WHERE
 						(option_name LIKE "%widget%"
 					AND
-						option_value LIKE "%'.$dev_http_host.'%")	
+						option_value LIKE "%'.$dev_http_host.'%")
 					OR
 						(option_name LIKE "%theme%"
 					AND
 						option_value LIKE "%'.$dev_http_host.'%");';
-		
-	//Swap back in the live URLs					
+
+	//Swap back in the live URLs
 	foreach ($connection->query($sql) as $row) {
    	$results[$options_table][$row['option_name']] = str_replace($dev_uri, $prod_uri,$row['option_value']);
   }
 }
-	
+
+//Loop through options tables and disable certain plugins
+foreach($options_tables as $options_table) {
+
+	$sql = "SELECT * FROM " . $options_table . " WHERE option_name='active_plugins'";
+
+	foreach ($connection->query($sql) as $row) {
+		$plugins = unserialize($row['option_value']);
+		$plugins = array_diff($plugins, array(
+			"email-users/email-users.php",
+			"jetpack/jetpack.php",
+			"subscribe2/subscribe2.php",
+		));
+
+		$results[$options_table][$row['option_name']] = serialize($plugins);
+	}
+}
+
 //var_dump($results['wp_813_options']);
 
 if (!isset($results)) {
 	print "No options to update.\n";
 	db_disconnect();
 	die();
-} 
+}
 
 //Unserialise the data
 foreach ($results as &$result) {
@@ -113,17 +130,17 @@ foreach ($results as &$result) {
 		}
 	}
 }
-	
+
 //Swap the DEV URLs back in
 array_walk_recursive($results, 'url_swap');
-	
+
 //Re-serialise the data
 foreach ($results as &$result) {
 	foreach ($result as &$unserialized_array){
 		$unserialized_array = serialize($unserialized_array);
 	}
 }
-	
+
 //insert the updated strings
 foreach ($results as $table => $options) {
 
@@ -138,7 +155,7 @@ foreach ($results as $table => $options) {
 		}
 	}
 }
-	
+
 //Disconnect
 db_disconnect();
 
