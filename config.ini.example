@@ -37,6 +37,7 @@ prod_http_host    = ;name of production https host for miis
 prod_http_path    = /
 prod_fs_host      = ;name of production web server for miis
 prod_fs_path      = ;path to wordpress installation for miis
+prod_fs_user      = ; Might be 'root' or some other account, defaults to the current user account
 prod_db_host      = ;name of production database host
 prod_db_database  = ;name of production database
 prod_db_user      = ;value of production database username
