@@ -94,7 +94,7 @@ done
 
 echo "Tables being dumped:"
 echo ${TABLES[@]}
-mysqldump -h ${prod_db_host} -u ${prod_db_user} -p"${prod_db_password}" ${prod_db_database} --set-gtid-purged=OFF --lock-tables=false --skip-extended-insert ${TABLES[@]} > "${prod_db_database}.sql"
+mysqldump -h ${prod_db_host} -u ${prod_db_user} -p"${prod_db_password}" ${prod_db_database} --lock-tables=false --skip-extended-insert ${TABLES[@]} > "${prod_db_database}.sql"
 
 
 echo "Swapping paths"

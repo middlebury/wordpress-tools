@@ -27,7 +27,7 @@ if [ ! "$YES" = true ]; then
 fi
 
 echo "Dumping all tables"
-mysqldump -h ${prod_db_host} -u ${prod_db_user} -p"${prod_db_password}" ${prod_db_database} --set-gtid-purged=OFF --lock-tables=false --skip-extended-insert > "${prod_db_database}.sql"
+mysqldump -h ${prod_db_host} -u ${prod_db_user} -p"${prod_db_password}" ${prod_db_database} --lock-tables=false --skip-extended-insert > "${prod_db_database}.sql"
 
 echo "Swapping paths"
 prod_http_host_escaped=${prod_http_host//./\\.}
