@@ -108,6 +108,7 @@ foreach($options_tables as $options_table) {
 			"email-users/email-users.php",
 			"jetpack/jetpack.php",
 			"subscribe2/subscribe2.php",
+                        "wordpress-mu-domain-mapping/domain_mapping.php",
 		));
 
 		$results[$options_table][$row['option_name']] = serialize($plugins);
