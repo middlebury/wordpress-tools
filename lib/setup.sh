@@ -135,6 +135,19 @@ else
 	prod_fs_user_prefix=""
 fi
 
+# If we have a specific SSH key specified, make sure that we can read it and
+# prep our variable for usage in the rsync command.
+rsync_key=$($wp_tools_path/lib/ini_get_var $config_file $config_section 'rsync_key')
+if [ ! -z "$rsync_key" ]; then
+  if [ ! -r "$rsync_key" ]; then
+    echo "$usage"
+    echo "    rsync_key was specified, but the file specified at $rsync_key is not readable."
+    exit 13
+  fi
+else
+	rsync_key=""
+fi
+
 prod_db_host=$($wp_tools_path/lib/ini_get_var $config_file $config_section 'prod_db_host')
 if [ -z "$prod_db_host" ]; then
   echo "$usage"

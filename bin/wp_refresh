@@ -56,6 +56,11 @@ fi
 
 # Sync files
 RSYNC_CMD="rsync -av ";
+# If we have an ssh specified, add the required options to the rsync command.
+if [ -r $rsync_key ]; then
+	RSYNC_CMD="${RSYNC_CMD} -e \"ssh -i ${rsync_key}\" "
+fi
+
 for SITE in "${SITES[@]}"
 do
 	RSYNC_CMD+="--include=\"${SITE}/***\" "
@@ -117,6 +122,3 @@ for SITE in "${SITES[@]}"
 do
 	$script_path/wp_update_settings $config_section "${SITE}"
 done
-
-
-
