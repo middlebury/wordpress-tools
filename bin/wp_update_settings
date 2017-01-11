@@ -157,6 +157,16 @@ foreach ($results as $table => $options) {
 	}
 }
 
+// Network-Deactivate the wordpress-mu-domain-mapping plugin since it will throw
+// errors on sub-path installations like in development.
+$sql = "SELECT * FROM wp_sitemeta WHERE meta_key='active_sitewide_plugins'";
+$update = $connection->prepare("UPDATE wp_sitemeta SET meta_value = :value WHERE meta_id = :id");
+foreach ($connection->query($sql) as $row) {
+  $plugins = unserialize($row['meta_value']);
+  unset($plugins["wordpress-mu-domain-mapping/domain_mapping.php"]);
+  $update->execute(array(':value' => serialize($plugins), ':id' => $row['meta_id']));
+}
+
 //Disconnect
 db_disconnect();
 
