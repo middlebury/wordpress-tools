@@ -106,3 +106,5 @@ cp ${dev_fs_path}wp-content/languages/twentyfifteen/* ${dev_fs_path}wp-content/t
 rm -rf ${dev_fs_path}wp-content/languages/twentyfifteen/
 cp ${dev_fs_path}wp-content/languages/twentysixteen/* ${dev_fs_path}wp-content/themes/twentysixteen/languages/
 rm -rf ${dev_fs_path}wp-content/languages/twentysixteen/
+cp ${dev_fs_path}wp-content/languages/twentyseventeen/* ${dev_fs_path}wp-content/themes/twentyseventeen/languages/
+rm -rf ${dev_fs_path}wp-content/languages/twentyseventeen/
