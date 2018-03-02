@@ -115,7 +115,7 @@ perl -p -i -e "s#${dev_http_host_escaped}','${prod_http_path}/#${dev_http_host}'
 echo "Importing data into local database"
 mysql -h ${dev_db_host} -u ${dev_db_user} -p"${dev_db_password}" ${dev_db_database} < "${prod_db_database}.sql"
 
--rm -f "${prod_db_database}.sql"
+rm -f "${prod_db_database}.sql"
 
 # Update blog options
 for SITE in "${SITES[@]}"
