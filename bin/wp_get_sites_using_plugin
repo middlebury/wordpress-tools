@@ -65,7 +65,7 @@ $tableRes = $db->query('SHOW TABLES;');
 while($row = $tableRes->fetch_row()) {
 	$table = $row[0];
 	if (preg_match('/^wp_?([0-9]*)_options$/', $table, $matches)) {
-		$usingRes = $db->query("select option_name, option_value from ".$table." where option_name='active_plugins' AND option_value LIKE '%".$db->escape_string($plugin)."%';");
+		$usingRes = $db->query("select option_name, option_value from ".$table." where option_name='active_plugins' AND option_value REGEXP '(\"|/)".$db->escape_string($plugin)."\\.php';");
 		if ($usingRes->num_rows) {
 			$nameRes = $db->query("select option_value from ".$table." where option_name = 'home';");
 			$nameRow = $nameRes->fetch_row();
