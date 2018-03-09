@@ -65,18 +65,18 @@ $tableRes = $db->query('SHOW TABLES;');
 while($row = $tableRes->fetch_row()) {
 	$table = $row[0];
 	if (preg_match('/^wp_?([0-9]*)_options$/', $table, $matches)) {
-		$usingRes = $db->query("select option_name, option_value from ".$table." where option_name='active_plugins' AND option_value REGEXP '(\"|/)".$db->escape_string($plugin)."\\.php';");
+		$usingRes = $db->query("select option_name, option_value from ".$table." where option_name='active_plugins' AND option_value REGEXP '(\"|/)".$db->escape_string($plugin)."(/|\\.php)';");
 		if ($usingRes->num_rows) {
 			$nameRes = $db->query("select option_value from ".$table." where option_name = 'home';");
 			$nameRow = $nameRes->fetch_row();
 			$url = $nameRow[0];
 			$nameRes->free();
-			
+
 			$nameRes = $db->query("select option_value from ".$table." where option_name = 'admin_email';");
 			$nameRow = $nameRes->fetch_row();
 			$email = $nameRow[0];
 			$nameRes->free();
-			
+
 			print $matches[1]."\t".$url."\t".$email."\n";
 		}
 		$usingRes->free();
@@ -84,4 +84,4 @@ while($row = $tableRes->fetch_row()) {
 }
 $tableRes->free();
 
-$db->close(); 
+$db->close();
