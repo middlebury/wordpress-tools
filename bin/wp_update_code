@@ -76,5 +76,10 @@ else
   echo "  git commit -m '$name: Upgraded $type from $old_version to $new_version. For #NNN'"
 fi
 
+echo ""
+echo "Line for Weekly Updates post:"
+echo "  WordPress $name $type <a href=\"https://wordpress.org/${type}s/$name#developers\">$new_version</a>"
+echo ""
+
 # Return to our original working directory.
 cd $orig_working_dir
