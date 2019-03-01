@@ -5,6 +5,12 @@
 usage="usage:
 $0 <config-section> <plugin|theme> <name> [issue_number]
 
+	<name> Can be just the plugin name or the path to the
+	       plugin directory. E.g.
+		       subscribe2
+		   or
+		       plugins/subscribe2/
+
 "
 
 # Define our directory path
@@ -25,7 +31,8 @@ then
   exit 2
 fi
 
-name=$3
+name=${3%/} # Trim any trailing slashes from name.
+name=`basename $name` # Trim off leading paths from the plugin name.
 
 # Move to our plugins directory.
 cd ${dev_fs_path}/wp-content/${type}s/

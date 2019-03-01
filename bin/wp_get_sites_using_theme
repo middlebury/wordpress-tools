@@ -5,8 +5,16 @@ $usage = <<<END
 Usage:
 	$argv[0] <config-section> <theme_name>
 
+	<theme_name> Can be just the theme name or the path to the
+	       theme directory. E.g.
+		       twentytwelve
+		   or
+		       wp-content/themes/twentytwelve/
+
+
 Example:
 	$argv[0] midd twentytwelve
+
 
 END;
 
@@ -30,7 +38,7 @@ if (empty($ini[$config_section])) {
 }
 
 
-$theme = $argv[2];
+$theme = basename(rtrim($argv[2], '/'));
 // require('/home/wordpress/websites/blogs/wp-config.php');
 
 $prod_db_host = $ini[$config_section]['prod_db_host'];

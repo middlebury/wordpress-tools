@@ -5,8 +5,16 @@ $usage = <<<END
 Usage:
 	$argv[0] <config-section> <plugin_name>
 
+	<plugin_name> Can be just the plugin name or the path to the
+	       plugin directory. E.g.
+		       subscribe2
+		   or
+		       plugins/subscribe2/
+
+
 Example:
 	$argv[0] midd cforms
+
 
 END;
 
@@ -30,7 +38,7 @@ if (empty($ini[$config_section])) {
 }
 
 
-$plugin = $argv[2];
+$plugin = basename(rtrim($argv[2], '/'));
 // require('/home/wordpress/websites/blogs/wp-config.php');
 
 $prod_db_host = $ini[$config_section]['prod_db_host'];
