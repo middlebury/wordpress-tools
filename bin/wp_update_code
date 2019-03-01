@@ -78,7 +78,7 @@ fi
 
 echo ""
 echo "Line for Weekly Updates post:"
-echo "  WordPress $name $type <a href=\"https://wordpress.org/${type}s/$name#developers\">$new_version</a>"
+echo "  <li>WordPress $name $type <a href=\"https://wordpress.org/${type}s/$name#developers\">$new_version</a></li>"
 echo ""
 
 # Return to our original working directory.
