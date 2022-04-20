@@ -1,0 +1,136 @@
+#!/usr/bin/env php
+<?php
+
+$usage = <<<END
+Export a list of posts that match the regular expression passed. In addition
+to site and post lists, also include each match within a post.
+
+Usage:
+	$argv[0] <config-section> <regex> <result_index>
+
+	<regex> A regular expression that will match the shortcode or content used by
+	        the plugin. The wp_*_posts.post_content field is searched.
+
+	<result_index> The regex subpattern to include in the output results.
+	        The default of 0 will include the whole matched string. Use 1 for the
+	        first parenthesized subpattern and so on.
+
+Example:
+	$argv[0] midd '\\[\\[\\d+\\]\\]' 0
+
+
+END;
+
+if (!isset($argv[2]) || !strlen(trim($argv[2])) || $argv[1] == '-h' || $argv[1] == '--help') {
+  fwrite(STDERR, $usage);
+  exit(1);
+}
+
+$config_section = $argv[1];
+if (empty($config_section) || $argc > 4) {
+	fwrite(STDERR, $usage);
+	exit(1);
+}
+
+$ini = parse_ini_file(dirname(dirname(__FILE__)).'/config.ini', true);
+global $dev_uri, $prod_uri;
+if (empty($ini[$config_section])) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "Config section, [$config_section], was not found in the ini file.");
+	exit(1);
+}
+
+
+$regex = trim($argv[2]);
+
+if (empty($argv[3])) {
+	$resultIndex = 0;
+} else {
+	if (is_numeric($argv[3])) {
+		$resultIndex = intval($argv[3]);
+	} else {
+		fwrite(STDERR, $usage);
+		fwrite(STDERR, "result_index must be an integer greater than or equal to 0.");
+		exit(1);
+	}
+	if ($resultIndex < 0) {
+		fwrite(STDERR, $usage);
+		fwrite(STDERR, "result_index must be an integer greater than or equal to 0.");
+		exit(1);
+	}
+}
+
+// require('/home/wordpress/websites/blogs/wp-config.php');
+
+$prod_db_host = $ini[$config_section]['prod_db_host'];
+if (empty($prod_db_host)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have prod_db_host defined.");
+	exit(2);
+}
+$prod_db_database = $ini[$config_section]['prod_db_database'];
+if (empty($prod_db_database)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have prod_db_database defined.");
+	exit(2);
+}
+$prod_db_user = $ini[$config_section]['prod_db_user'];
+if (empty($prod_db_user)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have prod_db_user defined.");
+	exit(2);
+}
+$prod_db_password = $ini[$config_section]['prod_db_password'];
+if (empty($prod_db_password)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have prod_db_password defined.");
+	exit(2);
+}
+
+
+$db = new mysqli($prod_db_host, $prod_db_user, $prod_db_password, $prod_db_database);
+
+$siteRows = $db->query('SELECT blog_id FROM wp_blogs WHERE archived=0 AND deleted=0')->fetch_all(MYSQLI_ASSOC);
+foreach ($siteRows as $siteRow) {
+	$siteId = $siteRow['blog_id'];
+
+	$nameRes = $db->query("select option_value from wp_".$siteId."_options where option_name = 'home';");
+	$nameRow = $nameRes->fetch_row();
+	$url = $nameRow[0];
+	$nameRes->free();
+
+	$nameRes = $db->query("select option_value from wp_".$siteId."_options where option_name = 'admin_email';");
+	$nameRow = $nameRes->fetch_row();
+	$email = $nameRow[0];
+	$nameRes->free();
+
+	print $siteId."\t".$url."\t".$email."\tText seen in:";
+
+	// look through posts for usage.
+	$textExists = FALSE;
+	$textRes = $db->query("SELECT * FROM wp_".$siteId."_posts WHERE post_content REGEXP '".preg_quote($regex)."' AND post_status='publish' GROUP BY ID");
+	while($postRow = $textRes->fetch_assoc()) {
+		$textExists = TRUE;
+		print "\n\t".$postRow['ID']
+			."\t".$url.'?p='.$postRow['ID']
+			// ."\t".$postRow['guid']
+			."\t".$postRow['post_date']
+			."\t".$postRow['post_title'];
+
+		// Count the actual matches in the text.
+		// For delimiter choice see:
+		// http://codelegance.com/ideal-regex-delimiters-in-php/
+		preg_match_all('{' . $regex . '}', $postRow['post_content'], $matches, PREG_SET_ORDER);
+		foreach ($matches as $match) {
+			print "\n\t\t\t".$match[$resultIndex];
+		}
+	}
+	$textRes->free();
+	if ($textExists) {
+		print "\n";
+	} else {
+		print " None\n";
+	}
+}
+
+$db->close();
