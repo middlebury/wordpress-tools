@@ -93,7 +93,7 @@ while($row = $tableRes->fetch_row()) {
 			$email = $nameRow[0];
 			$nameRes->free();
 
-			print $siteId."\t".$url."\t".$email."\tText seen in: ";
+			print $siteId."\t".$url."\t".$email."\tText seen in:";
 
 			// look through posts for usage.
 			$textExists = FALSE;
@@ -110,7 +110,7 @@ while($row = $tableRes->fetch_row()) {
 			if ($textExists) {
 				print "\n";
 			} else {
-				print "None\n";
+				print " None\n";
 			}
 		}
 	}
