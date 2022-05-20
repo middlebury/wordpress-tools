@@ -2,23 +2,18 @@
 <?php
 
 $usage = <<<END
+Answer site activity information (latest pages/posts) for all sites.
+
 Usage:
-	$argv[0] <config-section> <theme_name>
-
-	<theme_name> Can be just the theme name or the path to the
-	       theme directory. E.g.
-		       twentytwelve
-		   or
-		       wp-content/themes/twentytwelve/
-
+	$argv[0] <config-section>
 
 Example:
-	$argv[0] midd twentytwelve
+	$argv[0] midd
 
 
 END;
 
-if (!isset($argv[2]) || !strlen(trim($argv[2])) || $argv[1] == '-h' || $argv[1] == '--help') {
+if (!isset($argv[1]) || !strlen(trim($argv[1])) || $argv[1] == '-h' || $argv[1] == '--help') {
   fwrite(STDERR, $usage);
   exit(1);
 }
@@ -36,10 +31,6 @@ if (empty($ini[$config_section])) {
 	fwrite(STDERR, "Config section, [$config_section], was not found in the ini file.");
 	exit(1);
 }
-
-
-$theme = basename(rtrim($argv[2], '/'));
-// require('/home/wordpress/websites/blogs/wp-config.php');
 
 $prod_db_host = $ini[$config_section]['prod_db_host'];
 if (empty($prod_db_host)) {
@@ -74,26 +65,28 @@ while($row = $tableRes->fetch_row()) {
 	$table = $row[0];
 	if (preg_match('/^wp_?([0-9]*)_options$/', $table, $matches)) {
 		$siteId = $matches[1];
-		$usingRes = $db->query("select option_name, option_value from ".$table." where option_name='stylesheet' AND option_value='".$db->escape_string($theme)."';");
-		if ($usingRes->num_rows) {
-			$nameRes = $db->query("select option_value from ".$table." where option_name = 'home';");
-			$nameRow = $nameRes->fetch_row();
-			$url = $nameRow[0];
-			$nameRes->free();
 
-			$nameRes = $db->query("select option_value from ".$table." where option_name = 'admin_email';");
-			$nameRow = $nameRes->fetch_row();
-			$email = $nameRow[0];
-			$nameRes->free();
+		$nameRes = $db->query("select option_value from ".$table." where option_name = 'home';");
+		$nameRow = $nameRes->fetch_row();
+		$url = $nameRow[0];
+		$nameRes->free();
 
-			$postRes = $db->query("select post_modified from wp_".$siteId."_posts ORDER BY post_modified DESC LIMIT 1;");
-			$postRow = $postRes->fetch_row();
-			$postModified = $postRow[0];
-			$postRes->free();
+		$nameRes = $db->query("select option_value from ".$table." where option_name = 'admin_email';");
+		$nameRow = $nameRes->fetch_row();
+		$email = $nameRow[0];
+		$nameRes->free();
 
-			print $siteId."\t".$url."\t".$email."\t".$postModified."\n";
-		}
-		$usingRes->free();
+		$themeRes = $db->query("select option_value from ".$table." where option_name = 'stylesheet';");
+		$themeRow = $themeRes->fetch_row();
+		$theme = $themeRow[0];
+		$themeRes->free();
+
+		$postRes = $db->query("select post_modified from wp_".$siteId."_posts ORDER BY post_modified DESC LIMIT 1;");
+		$postRow = $postRes->fetch_row();
+		$postModified = $postRow[0];
+		$postRes->free();
+
+		print $siteId."\t".$url."\t".$email."\t".$postModified."\t".$theme."\n";
 	}
 }
 $tableRes->free();

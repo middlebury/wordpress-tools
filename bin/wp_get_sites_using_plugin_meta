@@ -97,7 +97,12 @@ while($row = $tableRes->fetch_row()) {
 			$email = $nameRow[0];
 			$nameRes->free();
 
-			print $siteId."\t".$url."\t".$email."\tText seen in:";
+			$postRes = $db->query("select post_modified from wp_".$siteId."_posts ORDER BY post_modified DESC LIMIT 1;");
+			$postRow = $postRes->fetch_row();
+			$postModified = $postRow[0];
+			$postRes->free();
+
+			print $siteId."\t".$url."\t".$email."\t".$postModified."\tText seen in:";
 
 			// look through postmeta for usage.
 			$textExists = FALSE;

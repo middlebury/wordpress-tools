@@ -92,10 +92,15 @@ while($row = $tableRes->fetch_row()) {
 			$email = $nameRow[0];
 			$nameRes->free();
 
+			$postRes = $db->query("select post_modified from wp_".$siteId."_posts ORDER BY post_modified DESC LIMIT 1;");
+			$postRow = $postRes->fetch_row();
+			$postModified = $postRow[0];
+			$postRes->free();
+
 			$countRes = $db->query("SELECT COUNT(*) as num FROM wp_".$siteId."_".$tableSuffix.";");
 			$num = $countRes->fetch_assoc()['num'];
 			$countRes->free();
-			print $siteId."\t".$url."\t".$email."\tNum rows in wp_".$siteId."_".$tableSuffix.": ". $num."\n";
+			print $siteId."\t".$url."\t".$email."\t".$postModified."\tNum rows in wp_".$siteId."_".$tableSuffix.": ". $num."\n";
 		}
 	}
 }
