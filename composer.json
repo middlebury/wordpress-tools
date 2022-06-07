@@ -1,0 +1,16 @@
+{
+    "name": "middlebury/wordpress-tools",
+    "description": "This package includes helper scripts for pulling sites down from production",
+    "type": "project",
+    "require": {
+        "microsoft/microsoft-graph": "^1.67",
+        "guzzlehttp/guzzle": "^7.4"
+    },
+    "license": "GPL-3.0-or-later",
+    "authors": [
+        {
+            "name": "Adam Franco",
+            "email": "afranco@middlebury.edu"
+        }
+    ]
+}

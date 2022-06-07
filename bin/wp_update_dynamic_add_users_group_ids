@@ -1,0 +1,266 @@
+#!/usr/bin/env php
+<?php
+
+require_once dirname(__DIR__) . '/vendor/autoload.php';
+require_once dirname(__DIR__) . '/lib/LdapConnector.php';
+
+use GuzzleHttp\Client as HttpClient;
+use GuzzleHttp\Exception\ClientException as HttpClientException;
+use Microsoft\Graph\Graph;
+use Microsoft\Graph\Model\Group;
+
+$usage = <<<END
+Answer site activity information (latest pages/posts) for all sites.
+
+Usage:
+	$argv[0] <config-section> <dev|prod> <test|write>
+
+Example:
+	$argv[0] midd dev
+
+
+END;
+
+if (!isset($argv[1]) || !strlen(trim($argv[1])) || $argv[1] == '-h' || $argv[1] == '--help') {
+  fwrite(STDERR, $usage);
+  exit(1);
+}
+
+$config_section = $argv[1];
+if (empty($config_section) || $argc > 4) {
+	fwrite(STDERR, $usage);
+	exit(1);
+}
+
+$mode = $argv[2];
+if (empty($mode) || !in_array($mode, ['dev', 'prod'])) {
+	fwrite(STDERR, $usage);
+	exit(1);
+}
+
+$write = $argv[3];
+if (empty($write) || !in_array($write, ['test', 'write'])) {
+	fwrite(STDERR, $usage);
+	exit(1);
+}
+
+$ini = parse_ini_file(dirname(dirname(__FILE__)).'/config.ini', true);
+global $dev_uri, $prod_uri;
+if (empty($ini[$config_section])) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "Config section, [$config_section], was not found in the ini file.");
+	exit(1);
+}
+
+// Update prod
+if ($mode == 'prod') {
+	$prod_db_host = $ini[$config_section]['prod_db_host'];
+	if (empty($prod_db_host)) {
+		fwrite(STDERR, $usage);
+		fwrite(STDERR, "config.ini [$config_section] must have prod_db_host defined.");
+		exit(2);
+	}
+	$prod_db_database = $ini[$config_section]['prod_db_database'];
+	if (empty($prod_db_database)) {
+		fwrite(STDERR, $usage);
+		fwrite(STDERR, "config.ini [$config_section] must have prod_db_database defined.");
+		exit(2);
+	}
+	$prod_db_user = $ini[$config_section]['prod_db_user'];
+	if (empty($prod_db_user)) {
+		fwrite(STDERR, $usage);
+		fwrite(STDERR, "config.ini [$config_section] must have prod_db_user defined.");
+		exit(2);
+	}
+	$prod_db_password = $ini[$config_section]['prod_db_password'];
+	if (empty($prod_db_password)) {
+		fwrite(STDERR, $usage);
+		fwrite(STDERR, "config.ini [$config_section] must have prod_db_password defined.");
+		exit(2);
+	}
+	$db = new mysqli($prod_db_host, $prod_db_user, $prod_db_password, $prod_db_database);
+}
+// Update dev.
+else {
+	$dev_db_host = $ini[$config_section]['dev_db_host'];
+	if (empty($dev_db_host)) {
+		fwrite(STDERR, $usage);
+		fwrite(STDERR, "config.ini [$config_section] must have dev_db_host defined.");
+		exit(2);
+	}
+	$dev_db_database = $ini[$config_section]['dev_db_database'];
+	if (empty($dev_db_database)) {
+		fwrite(STDERR, $usage);
+		fwrite(STDERR, "config.ini [$config_section] must have dev_db_database defined.");
+		exit(2);
+	}
+	$dev_db_user = $ini[$config_section]['dev_db_user'];
+	if (empty($dev_db_user)) {
+		fwrite(STDERR, $usage);
+		fwrite(STDERR, "config.ini [$config_section] must have dev_db_user defined.");
+		exit(2);
+	}
+	$dev_db_password = $ini[$config_section]['dev_db_password'];
+	if (empty($dev_db_password)) {
+		fwrite(STDERR, $usage);
+		fwrite(STDERR, "config.ini [$config_section] must have dev_db_password defined.");
+		exit(2);
+	}
+	$db = new mysqli($dev_db_host, $dev_db_user, $dev_db_password, $dev_db_database);
+}
+
+// On-Prem LDAP connection info.
+$ldap_url = $ini[$config_section]['ldap_url'];
+if (empty($ldap_url)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have ldap_url defined.");
+	exit(2);
+}
+$ldap_user = $ini[$config_section]['ldap_user'];
+if (empty($ldap_user)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have ldap_user defined.");
+	exit(2);
+}
+$ldap_password = $ini[$config_section]['ldap_password'];
+if (empty($ldap_password)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have ldap_password defined.");
+	exit(2);
+}
+
+// AzureAD connection info.
+$azure_tennant_id = $ini[$config_section]['azure_tennant_id'];
+if (empty($azure_tennant_id)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have azure_tennant_id defined.");
+	exit(2);
+}
+$azure_application_id = $ini[$config_section]['azure_application_id'];
+if (empty($azure_application_id)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have azure_application_id defined.");
+	exit(2);
+}
+$azure_application_secret = $ini[$config_section]['azure_application_secret'];
+if (empty($azure_application_secret)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have azure_application_secret defined.");
+	exit(2);
+}
+
+
+$ldapConnectorConfig = [
+	'LDAPURL' => $ldap_url,
+	'BindDN' => $ldap_user,
+	'BindDNPassword' => $ldap_password,
+	'BaseDN' => 'DC=middlebury,DC=edu',
+	'UserBaseDN' => 'DC=middlebury,DC=edu',
+	'GroupBaseDN' => [
+		'OU=Groups,DC=middlebury,DC=edu',
+		'OU=web data,DC=middlebury,DC=edu',
+		'OU=Groups,OU=MIIS,DC=middlebury,DC=edu',
+	],
+	'UserIdAttribute' => 'middleburyCollegeUID',
+	'UserAttributes' => [],
+	'GroupIdAttribute' => 'distinguishedName',
+	'GroupAttributes' => [
+		'objectsid' => 'objectsid',
+	],
+];
+$ldap = new LdapConnector($ldapConnectorConfig);
+$ldap->connect();
+
+$graph = new Graph();
+$graph->setAccessToken(getAccessToken($azure_tennant_id, $azure_application_id, $azure_application_secret));
+
+function getAccessToken($azure_tennant_id, $azure_application_id, $azure_application_secret) {
+	try {
+    $url = 'https://login.microsoftonline.com/' . $azure_tennant_id . '/oauth2/v2.0/token';
+		$httpClient = new HttpClient();
+    $response = $httpClient->post($url, [
+      'form_params' => [
+        'client_id' => $azure_application_id,
+        'client_secret' => $azure_application_secret,
+        'scope' => 'https://graph.microsoft.com/.default',
+        'grant_type' => 'client_credentials',
+      ],
+    ]);
+    $token_response = json_decode($response->getBody()->getContents());
+    return $token_response->access_token;
+  }
+  catch (HttpClientException $e) {
+    if ($e->hasResponse()) {
+      $response = $e->getResponse();
+      $response_info = json_decode($response->getBody()->getContents());
+      throw new \Exception($response_info->error . ': ' . $response_info->error_description);
+    }
+    throw $e;
+  }
+}
+
+// Loop through all groups and update them to the AzureAD ID using the onPremisesSecurityIdentifier as the matching key.
+$existingRes = $db->query('SELECT DISTINCT(group_id) FROM ( SELECT group_id FROM `wp_dynaddusers_groups` UNION SELECT group_id FROM `wp_dynaddusers_synced`) g;');
+while($row = $existingRes->fetch_row()) {
+	$groupDN = $row[0];
+	print $groupDN . "\t";
+
+	if (!preg_match('/^CN=.+/', $groupDN)) {
+		print "NOT A DN, skipping\n";
+		continue;
+	}
+
+	// Look up the objectsid via LDAP.
+	try {
+		$ldapGroup = $ldap->getGroup(['id' => $groupDN]);
+		$objectsids = $ldapGroup->getAttributeValues('objectsid');
+		if (empty($objectsids[0])) {
+			throw new Exception("Couldn't find an objectsid for ".$groupDN);
+		}
+		$objectsid = LdapGroup::SIDtoString($objectsids[0]);
+
+		print $objectsid . "\t";
+
+		// Look up the object in AzureAD mapping the objectsid to onPremisesSecurityIdentifier.
+		$path = "/groups";
+		$path .= "?\$filter=onPremisesSecurityIdentifier eq '" . urlencode($objectsid) ."'";
+			//."&\$select=id,displayName,mail,description,groupTypes,onPremisesSecurityIdentifier";
+
+		$result = $graph
+			->createRequest("GET", $path)
+			->addHeaders(['ConsistencyLevel' => 'eventual'])
+			->setReturnType(Group::class)
+			->execute();
+		if (is_array($result)) {
+			if (count($result) > 1) {
+				throw new Exception("Multiple AzureAD groups found for $objectsid.");
+			}
+			$azureAdGroup = $result[0];
+			$azureAdGroupId = $azureAdGroup->getId();
+			print $azureAdGroupId . "\t";
+
+			// If we are writing, update the DB.
+			if ($write == 'write') {
+				$updateStmt = $db->prepare('UPDATE wp_dynaddusers_groups SET group_id = ? WHERE group_id = ?');
+				$updateStmt->bind_param('ss', $azureAdGroupId, $groupDN);
+				$updateStmt->execute();
+
+				$updateStmt = $db->prepare('UPDATE wp_dynaddusers_synced SET group_id = ? WHERE group_id = ?');
+				$updateStmt->bind_param('ss', $azureAdGroupId, $groupDN);
+				$updateStmt->execute();
+			}
+		}
+
+	} catch (InvalidArgumentException $e) {
+		print $e->getMessage();
+	} catch (UnknownIdException $e) {
+		print "NOT FOUND IN LDAP";
+	} catch (LdapException $e) {
+		print "NOT FOUND IN LDAP";
+	}
+
+	print "\n";
+}
+$existingRes->free();
+
+$db->close();
