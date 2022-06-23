@@ -239,10 +239,16 @@ while($row = $existingRes->fetch_row()) {
 			$azureAdGroupId = $azureAdGroup->getId();
 			print $azureAdGroupId . "\t";
 
+			$azureAdGroupDisplayName = $azureAdGroup->getDisplayName();
+			if ($azureAdGroup->getDescription() && $azureAdGroup->getDescription() != $azureAdGroup->getDisplayName()) {
+				$azureAdGroupDisplayName .= ' (' . $azureAdGroup->getDescription() . ')';
+			}
+			print $azureAdGroupDisplayName . "\t";
+
 			// If we are writing, update the DB.
 			if ($write == 'write') {
-				$updateStmt = $db->prepare('UPDATE wp_dynaddusers_groups SET group_id = ? WHERE group_id = ?');
-				$updateStmt->bind_param('ss', $azureAdGroupId, $groupDN);
+				$updateStmt = $db->prepare('UPDATE wp_dynaddusers_groups SET group_id = ?, group_label = ? WHERE group_id = ?');
+				$updateStmt->bind_param('sss', $azureAdGroupId, $azureAdGroupDisplayName, $groupDN);
 				$updateStmt->execute();
 
 				$updateStmt = $db->prepare('UPDATE wp_dynaddusers_synced SET group_id = ? WHERE group_id = ?');
