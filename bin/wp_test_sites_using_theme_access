@@ -1,0 +1,144 @@
+#!/usr/bin/env php
+<?php
+
+$usage = <<<END
+Usage:
+	$argv[0] <config-section> <theme_name> <test-hostname> <cookies>
+
+	<test-hostname> The hostname to send HTTPS requests to.
+	<cookies> A cookie string to send to get logged-in responses.
+	          Get from your browser.
+
+
+Example:
+	$argv[0] midd php81-wordpress-test 'wordpress_test_cookie=WP%20Cookie%20check; wordpress_sec_ddb20f6b4e0ae3920102b8860666f220=b0f8....8a5; wordpress_logged_in_ddb20f6b4e0ae3920102b8860666f220=b0f8...8a5'
+
+
+END;
+
+if (!isset($argv[4]) || !strlen(trim($argv[4])) || !strlen(trim($argv[2])) || $argv[1] == '-h' || $argv[1] == '--help') {
+  fwrite(STDERR, $usage);
+  exit(1);
+}
+
+$config_section = $argv[1];
+if (empty($config_section) || $argc > 5) {
+	fwrite(STDERR, $usage);
+	exit(1);
+}
+
+$ini = parse_ini_file(dirname(dirname(__FILE__)).'/config.ini', true);
+global $dev_uri, $prod_uri;
+if (empty($ini[$config_section])) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "Config section, [$config_section], was not found in the ini file.");
+	exit(1);
+}
+
+$themeToCheck = basename(rtrim($argv[2], '/'));
+$hostname = trim($argv[3]);
+$cookies = trim($argv[4]);
+// require('/home/wordpress/websites/blogs/wp-config.php');
+
+$prod_db_host = $ini[$config_section]['prod_db_host'];
+if (empty($prod_db_host)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have prod_db_host defined.");
+	exit(2);
+}
+$prod_db_database = $ini[$config_section]['prod_db_database'];
+if (empty($prod_db_database)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have prod_db_database defined.");
+	exit(2);
+}
+$prod_db_user = $ini[$config_section]['prod_db_user'];
+if (empty($prod_db_user)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have prod_db_user defined.");
+	exit(2);
+}
+$prod_db_password = $ini[$config_section]['prod_db_password'];
+if (empty($prod_db_password)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have prod_db_password defined.");
+	exit(2);
+}
+
+
+$db = new mysqli($prod_db_host, $prod_db_user, $prod_db_password, $prod_db_database);
+
+// Select a list of all sites with id, URL, and theme.
+$sites = [];
+$themes = [];
+$names = [];
+$tableRes = $db->query('SHOW TABLES;');
+while($row = $tableRes->fetch_row()) {
+	$table = $row[0];
+	if (preg_match('/^wp_?([0-9]*)_options$/', $table, $matches)) {
+		$siteId = $matches[1];
+
+		$themeRes = $db->query("select option_value from ".$table." where option_name = 'stylesheet';");
+		$themeRow = $themeRes->fetch_row();
+		$theme = $themeRow[0];
+		$themeRes->free();
+
+		if ($theme != $themeToCheck) {
+			continue;
+		}
+
+		$nameRes = $db->query("select option_value from ".$table." where option_name = 'home';");
+		$nameRow = $nameRes->fetch_row();
+		$url = $nameRow[0];
+		$nameRes->free();
+
+		// $nameRes = $db->query("select option_value from ".$table." where option_name = 'admin_email';");
+		// $nameRow = $nameRes->fetch_row();
+		// $email = $nameRow[0];
+		// $nameRes->free();
+
+		// $postRes = $db->query("select post_modified from wp_".$siteId."_posts ORDER BY post_modified DESC LIMIT 1;");
+		// $postRow = $postRes->fetch_row();
+		// $postModified = $postRow[0];
+		// $postRes->free();
+
+		$urlParts = parse_url($url);
+		$name = trim($urlParts['path'], '/');
+		$sites[] = [
+			'id' => $siteId,
+			// Ensure that we are using https and have a trailing slash.
+			'name' => $name,
+			'url' => rtrim(preg_replace('@^http://@', 'https://', $url), '/') . '/',
+			'theme' => $theme,
+			// 'email' => $email,
+			// 'modified' => $postModified,
+		];
+
+		$themes[] = $theme;
+		$names[] = $name;
+	}
+}
+$tableRes->free();
+$db->close();
+
+// Sort sites based on theme as this is where most of the errors are.
+array_multisort($themes, $names, $sites);
+
+// Loop through our sites and make a test request to each homepage.
+foreach ($sites as $site) {
+	$url = $site['url'];
+	$urlParts = parse_url($url);
+	$siteHost = $urlParts['host'];
+	$sitePath = $urlParts['path'];
+	$result = `curl -k -H 'Host: $siteHost' -H 'Cookie: $cookies' -s -o /dev/null -w "%{http_code}" https://$hostname$sitePath`;
+	// Follow one permenant redirect if presented by domain mapping.
+	// Login requests should be temporary 302 redirects and ignored.
+	if (intval($result) == 301) {
+		$url = `curl -k -H 'Host: $siteHost' -H 'Cookie: $cookies' -s -o /dev/null -w "%{redirect_url}" https://$hostname$sitePath`;
+		$urlParts = parse_url($url);
+		$siteHost = $urlParts['host'];
+		$sitePath = $urlParts['path'];
+		$result = `curl -k -H 'Host: $siteHost' -H 'Cookie: $cookies' -s -o /dev/null -w "%{http_code}" https://$hostname$sitePath`;
+	}
+	print "$result\t${site['theme']}\t${site['name']}\t${site['id']}\t$url\n";
+}
