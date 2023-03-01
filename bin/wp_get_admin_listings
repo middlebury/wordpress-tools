@@ -63,6 +63,7 @@ $db = new mysqli($prod_db_host, $prod_db_user, $prod_db_password, $prod_db_datab
 
 $userMetaStmt = $db->prepare("SELECT meta_key FROM wp_usermeta WHERE user_id = ? AND meta_key LIKE 'wp_%_capabilities' AND meta_value LIKE '%administrator%' ORDER BY meta_key ASC;");
 
+fputcsv(STDOUT, ['email', 'name', 'sites']);
 $results = [];
 $userRes = $db->query("SELECT u.ID, u.user_email, u.display_name FROM wp_users u LEFT JOIN wp_usermeta m on u.ID = m.user_id WHERE meta_key LIKE 'wp_%_capabilities' AND meta_value LIKE '%administrator%' GROUP BY u.ID ORDER BY u.user_email ASC;");
 foreach ($userRes->fetch_all() as $userRow) {
@@ -84,6 +85,7 @@ foreach ($userRes->fetch_all() as $userRow) {
 				$nameRow = $nameRes->fetch_row();
 				$url = $nameRow[0];
 				$nameRes->free();
+				$url = preg_replace('#^http://#', 'https://', $url);
 
 				$emailRes = $db->query("select option_value from wp_".$siteId."_options where option_name = 'admin_email';");
 				$emailRow = $emailRes->fetch_row();
