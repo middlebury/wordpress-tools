@@ -1,0 +1,139 @@
+#!/usr/bin/env php
+<?php
+
+$usage = <<<END
+Answer site activity information (latest pages/posts) for all sites.
+
+Usage:
+	$argv[0] <config-section>
+
+Example:
+	$argv[0] midd
+
+
+END;
+
+if (!isset($argv[1]) || !strlen(trim($argv[1])) || $argv[1] == '-h' || $argv[1] == '--help') {
+  fwrite(STDERR, $usage);
+  exit(1);
+}
+
+$config_section = $argv[1];
+if (empty($config_section) || $argc > 3) {
+	fwrite(STDERR, $usage);
+	exit(1);
+}
+
+$ini = parse_ini_file(dirname(dirname(__FILE__)).'/config.ini', true);
+global $dev_uri, $prod_uri;
+if (empty($ini[$config_section])) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "Config section, [$config_section], was not found in the ini file.");
+	exit(1);
+}
+
+$prod_db_host = $ini[$config_section]['prod_db_host'];
+if (empty($prod_db_host)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have prod_db_host defined.");
+	exit(2);
+}
+$prod_db_database = $ini[$config_section]['prod_db_database'];
+if (empty($prod_db_database)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have prod_db_database defined.");
+	exit(2);
+}
+$prod_db_user = $ini[$config_section]['prod_db_user'];
+if (empty($prod_db_user)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have prod_db_user defined.");
+	exit(2);
+}
+$prod_db_password = $ini[$config_section]['prod_db_password'];
+if (empty($prod_db_password)) {
+	fwrite(STDERR, $usage);
+	fwrite(STDERR, "config.ini [$config_section] must have prod_db_password defined.");
+	exit(2);
+}
+
+$driver = new mysqli_driver();
+$driver->report_mode = MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT;
+$db = new mysqli($prod_db_host, $prod_db_user, $prod_db_password, $prod_db_database);
+
+$userMetaStmt = $db->prepare("SELECT meta_key FROM wp_usermeta WHERE user_id = ? AND meta_key LIKE 'wp_%_capabilities' AND meta_value LIKE '%administrator%' ORDER BY meta_key ASC;");
+
+$results = [];
+$userRes = $db->query("SELECT u.ID, u.user_email, u.display_name FROM wp_users u LEFT JOIN wp_usermeta m on u.ID = m.user_id WHERE meta_key LIKE 'wp_%_capabilities' AND meta_value LIKE '%administrator%' GROUP BY u.ID ORDER BY u.user_email ASC;");
+foreach ($userRes->fetch_all() as $userRow) {
+	// Fetch the sites for this user.
+	$userId = $userRow[0];
+	$userEmail = $userRow[1];
+	$userDisplayName = $userRow[2];
+	$userSites = [];
+
+
+	$userMetaStmt->execute([$userId]);
+	$userMetaRes = $userMetaStmt->get_result();
+	foreach ($userMetaRes->fetch_all() as $metaRow) {
+		if (preg_match('/^wp_?([0-9]*)_capabilities$/', $metaRow[0], $matches)) {
+			$siteId = $matches[1];
+
+			try {
+				$nameRes = $db->query("select option_value from wp_".$siteId."_options where option_name = 'home';");
+				$nameRow = $nameRes->fetch_row();
+				$url = $nameRow[0];
+				$nameRes->free();
+
+				$emailRes = $db->query("select option_value from wp_".$siteId."_options where option_name = 'admin_email';");
+				$emailRow = $emailRes->fetch_row();
+				$email = $emailRow[0];
+				$emailRes->free();
+
+				$themeRes = $db->query("select option_value from wp_".$siteId."_options where option_name = 'stylesheet';");
+				$themeRow = $themeRes->fetch_row();
+				$theme = $themeRow[0];
+				$themeRes->free();
+
+				$postRes = $db->query("select post_modified from wp_".$siteId."_posts ORDER BY post_modified DESC LIMIT 1;");
+				$postRow = $postRes->fetch_row();
+				$postModified = $postRow[0];
+				$postRes->free();
+
+				$userSites[] = [
+					'id' => $siteId,
+					'url' => $url,
+					'email' => $email,
+					'last_modified' => $postModified,
+				];
+			} catch (mysqli_sql_exception $e) {
+				if ($e->getCode() != 1146) {
+					fwrite(STDERR, $e->getMessage()."\t" . $e->getCode() . "\n");
+				}
+			}
+		}
+	}
+
+	printUserRow($userEmail, $userDisplayName, $userSites);
+}
+$userMetaRes->free();
+
+$db->close();
+
+function printUserRow($userEmail, $userDisplayName, array $sites) {
+	ob_start();
+	print "<ul>";
+	foreach ($sites as $site) {
+		extract($site);
+		print "<li><dl>";
+		print "<dt>Midd-hosted (current) site:</dt><dd><a href='$url'>$url</a></dd>";
+		print "<dt>Midd-hosted (current) site was last updated:</dt><dd>$last_modified</dd>";
+		$test_url = preg_replace('#^https?://sites.middlebury.edu/#', 'https://sites-test.middlebury.edu/', $url);
+		print "<dt>CampusPress-hosted (test) site:</dt><dd><a href='$test_url'>$test_url</a></dd>";
+		print "<dt>CampusPress-hosted (test) site was copied on:</dt><dd>2022-01-06</dd>";
+		print "<dt>Primary site administrator email (is this correct?):</dt><dd>$email</dd>";
+		print "</dl><br/></li>";
+	}
+	print "</ul>";
+	fputcsv(STDOUT, [$userEmail, $userDisplayName, ob_get_clean()]);
+}
